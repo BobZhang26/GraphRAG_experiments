@@ -237,7 +237,7 @@ def context_builder(graph, query, method="hybrid"):
     context = ""
     if method == "vector":
         output = chunk_finder(graph, query)
-        context = "Given the following context in the format [(File Name, Text),...] \n"
+        # context = "Given the following context in the format [(File Name, Text),...] \n"
         context += str(output)
 
     elif method == "graph":
@@ -378,3 +378,113 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
     # Write the markdown content to a file
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(markdown_content))
+
+############################################################################################################
+# NEW CHUNCK FINDER FUNCTIONS
+############################################################################################################
+from typing import List, Tuple, Dict, Optional
+import logging
+
+def enhanced_chunk_finder(
+    graph,
+    query: str,
+    limit: int = 80,
+    similarity_threshold: float = 0.7,
+    max_hops: int = 2
+) -> List[Tuple[str, str]]:
+    """
+    Retrieves relevant chunks by combining vector search with graph traversal.
+    
+    Args:
+        graph: The graph database connection
+        query: The search query string
+        limit: Maximum number of chunks to return
+        similarity_threshold: Minimum similarity score for vector search results
+        max_hops: Maximum number of relationship hops to traverse in the graph
+        
+    Returns:
+        List of tuples containing (filename, chunk_text)
+    """
+    try:
+        # Get query embedding and perform vector search
+        query_embedding = embed_entity(query)
+        vector_results = vector_search(graph, query_embedding)
+        
+        if not vector_results:
+            logging.warning("No vector search results found for query")
+            return []
+            
+        # Filter vector results by similarity threshold
+        relevant_ids = [
+            result["node.id"] 
+            for result in vector_results 
+            if result.get("similarity", 0) >= similarity_threshold
+        ]
+        
+        if not relevant_ids:
+            logging.info("No results met the similarity threshold")
+            return []
+            
+        # Construct graph query to find connected chunks
+        ids_clause = ", ".join([f"'{id}'" for id in relevant_ids])
+        chunk_find_query = f"""
+        MATCH (n:Chunk)-[r*1..{max_hops}]->(m:`__Entity__`)
+        WHERE m.id IN [{ids_clause}]
+        WITH n, min(length(r)) as distance
+        ORDER BY distance
+        RETURN DISTINCT n.text, n.fileName
+        LIMIT {limit}
+        """
+        
+        # Execute graph query
+        result = graph.query(chunk_find_query)
+        
+        # Process results
+        output = []
+        seen_chunks = set()  # Avoid duplicates
+        
+        for record in result:
+            chunk_text = record["n.text"]
+            if chunk_text not in seen_chunks:
+                output.append((record["n.fileName"], chunk_text))
+                seen_chunks.add(chunk_text)
+                
+        return output
+        
+    except Exception as e:
+        logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
+        raise
+
+def get_chunk_metadata(
+    graph,
+    chunk_ids: List[str]
+) -> Dict[str, Dict]:
+    """
+    Helper function to retrieve additional metadata for chunks.
+    
+    Args:
+        graph: The graph database connection
+        chunk_ids: List of chunk IDs to query
+        
+    Returns:
+        Dictionary mapping chunk IDs to their metadata
+    """
+    ids_clause = ", ".join([f"'{id}'" for id in chunk_ids])
+    metadata_query = f"""
+    MATCH (n:Chunk)
+    WHERE n.id IN [{ids_clause}]
+    RETURN n.id, n.created, n.lastModified, n.author, n.version
+    """
+    
+    result = graph.query(metadata_query)
+    
+    metadata = {}
+    for record in result:
+        metadata[record["n.id"]] = {
+            "created": record["n.created"],
+            "lastModified": record["n.lastModified"],
+            "author": record["n.author"],
+            "version": record["n.version"]
+        }
+        
+    return metadata
