@@ -100,7 +100,7 @@ def chunk_finder(graph, query):
     query_embedding = embed_entity(query)
     response = vector_search(graph, query_embedding)
     id = response[0]["node.id"]
-
+    
     chunk_find_query = f"""
     MATCH (n:Chunk)-[r]->(m:`__Entity__` {{id: "{id}"}}) RETURN n.text,n.fileName LIMIT 80
     """
@@ -108,7 +108,7 @@ def chunk_finder(graph, query):
     output = []
     for record in result:
         output.append((record["n.fileName"], record["n.text"]))
-    return output
+    return output , response
 
 
 def get_entities(prompt: str, correction_context: str = " ") -> Tuple[List[str], str]:
@@ -388,8 +388,8 @@ import logging
 def enhanced_chunk_finder(
     graph,
     query: str,
-    limit: int = 80,
-    similarity_threshold: float = 0.7,
+    limit: int = 8,
+    similarity_threshold: float = 0.8,
     max_hops: int = 2
 ) -> List[Tuple[str, str]]:
     """
@@ -418,7 +418,7 @@ def enhanced_chunk_finder(
         relevant_ids = [
             result["node.id"] 
             for result in vector_results 
-            if result.get("similarity", 0) >= similarity_threshold
+            if result.get("score", 0) >= similarity_threshold
         ]
         
         if not relevant_ids:
@@ -426,11 +426,12 @@ def enhanced_chunk_finder(
             return []
             
         # Construct graph query to find connected chunks
-        ids_clause = ", ".join([f"'{id}'" for id in relevant_ids])
+        ids_clause = ", ".join([f'"{id}"' for id in relevant_ids])
         chunk_find_query = f"""
-        MATCH (n:Chunk)-[r*1..{max_hops}]->(m:`__Entity__`)
+        MATCH path = (n:Chunk)-[*1..{max_hops}]->(m:`__Entity__`)
         WHERE m.id IN [{ids_clause}]
-        WITH n, min(length(r)) as distance
+        WITH n, path
+        WITH n, min(length(path)) as distance
         ORDER BY distance
         RETURN DISTINCT n.text, n.fileName
         LIMIT {limit}
@@ -442,18 +443,21 @@ def enhanced_chunk_finder(
         # Process results
         output = []
         seen_chunks = set()  # Avoid duplicates
+        filenames = set()  # Avoid multiple chunks from the same file
         
         for record in result:
             chunk_text = record["n.text"]
+            filenames.add(record["n.fileName"])
             if chunk_text not in seen_chunks:
                 output.append((record["n.fileName"], chunk_text))
                 seen_chunks.add(chunk_text)
                 
-        return output
+        return list(filenames) , output
         
     except Exception as e:
         logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
         raise
+
 
 def get_chunk_metadata(
     graph,
