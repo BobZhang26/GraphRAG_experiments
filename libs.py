@@ -452,7 +452,7 @@ def enhanced_chunk_finder(
                 output.append((record["n.fileName"], chunk_text))
                 seen_chunks.add(chunk_text)
                 
-        return list(filenames)
+        return list(filenames) , output
         
     except Exception as e:
         logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
