@@ -391,20 +391,7 @@ def enhanced_chunk_finder(
     limit: int = 8,
     similarity_threshold: float = 0.8,
     max_hops: int = 2
-) -> List[Tuple[str, str]]:
-    """
-    Retrieves relevant chunks by combining vector search with graph traversal.
-    
-    Args:
-        graph: The graph database connection
-        query: The search query string
-        limit: Maximum number of chunks to return
-        similarity_threshold: Minimum similarity score for vector search results
-        max_hops: Maximum number of relationship hops to traverse in the graph
-        
-    Returns:
-        List of tuples containing (filename, chunk_text)
-    """
+) -> List[Tuple[str, str, int, int, float]]:
     try:
         # Get query embedding and perform vector search
         query_embedding = embed_entity(query)
@@ -412,28 +399,32 @@ def enhanced_chunk_finder(
         
         if not vector_results:
             logging.warning("No vector search results found for query")
-            return []
+            return [], []
             
-        # Filter vector results by similarity threshold
-        relevant_ids = [
-            result["node.id"] 
-            for result in vector_results 
+        # Create a dictionary to store entity IDs and their similarity scores
+        similarity_scores = {
+            result["node.id"]: result["score"]
+            for result in vector_results
             if result.get("score", 0) >= similarity_threshold
-        ]
+        }
         
-        if not relevant_ids:
+        if not similarity_scores:
             logging.info("No results met the similarity threshold")
-            return []
+            return [], []
             
         # Construct graph query to find connected chunks
-        ids_clause = ", ".join([f'"{id}"' for id in relevant_ids])
+        ids_clause = ", ".join([f'"{id}"' for id in similarity_scores.keys()])
         chunk_find_query = f"""
         MATCH path = (n:Chunk)-[*1..{max_hops}]->(m:`__Entity__`)
         WHERE m.id IN [{ids_clause}]
-        WITH n, path
-        WITH n, min(length(path)) as distance
+        WITH n, path, m, 
+             CASE 
+                WHEN m.id IN [{ids_clause}] 
+                THEN m.id 
+             END as entity_id
+        WITH n, min(length(path)) as distance, entity_id
         ORDER BY distance
-        RETURN DISTINCT n.text, n.fileName
+        RETURN n.text, n.fileName, n.page_number, n.position, entity_id
         LIMIT {limit}
         """
         
@@ -442,17 +433,27 @@ def enhanced_chunk_finder(
         
         # Process results
         output = []
-        seen_chunks = set()  # Avoid duplicates
-        filenames = set()  # Avoid multiple chunks from the same file
+        seen_chunks = set()
+        filenames = set()
         
         for record in result:
             chunk_text = record["n.text"]
             filenames.add(record["n.fileName"])
             if chunk_text not in seen_chunks:
-                output.append((record["n.fileName"], chunk_text))
+                # Get the similarity score for the entity
+                entity_id = record["entity_id"]
+                similarity_score = similarity_scores.get(entity_id, 0.0)
+                
+                output.append((
+                    record["n.fileName"],
+                    chunk_text,
+                    record["n.page_number"],
+                    record["n.position"],
+                    similarity_score
+                ))
                 seen_chunks.add(chunk_text)
                 
-        return list(filenames) , output
+        return list(filenames), output
         
     except Exception as e:
         logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
@@ -477,7 +478,7 @@ def get_chunk_metadata(
     metadata_query = f"""
     MATCH (n:Chunk)
     WHERE n.id IN [{ids_clause}]
-    RETURN n.id, n.created, n.lastModified, n.author, n.version
+    RETURN n.id, n.fileName, n.page_number, n.position
     """
     
     result = graph.query(metadata_query)
@@ -485,10 +486,9 @@ def get_chunk_metadata(
     metadata = {}
     for record in result:
         metadata[record["n.id"]] = {
-            "created": record["n.created"],
-            "lastModified": record["n.lastModified"],
-            "author": record["n.author"],
-            "version": record["n.version"]
+            "fileName": record["n.fileName"],
+            "page_number": record["n.page_number"],
+            "position": record["n.position"]
         }
         
     return metadata
