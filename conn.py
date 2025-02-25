@@ -4,7 +4,7 @@ from sklearn.metrics import precision_score, recall_score, accuracy_score
 from dotenv import load_dotenv
 import os
 import pandas as pd
-from libs import generate_response
+from libs import enhanced_chunk_finder
 
 
 def connect2Googlesheet():
@@ -31,31 +31,39 @@ def get_relevant_documents(df, question):
 
 
 # Function to retrieve relevant documents for a specific question
-def retrieval_rel_docs(graph, questions, top_k=5):
+def retrieval_rel_docs (graph, questions, top_k=5):
     top_k_questions = questions.head(top_k)
     # Initialize a list to store the results
     results = []
     # Iterate over the top k questions
     for index, row in top_k_questions.iterrows():
         question_number = index + 1  # Assuming the question number is the index + 1
-        question = row[
-            "Question"
-        ]  # Replace 'Question' with the actual column name for questions in df_MedQ
-
+        question = row['Question']  # Replace 'Question' with the actual column name for questions in df_MedQ
+        
         # Generate response for the question
-        response, context = generate_response(graph, question)
-
+        # context = context_builder(graph, question, method="vector")
+        filenames , output = enhanced_chunk_finder(graph, question,similarity_threshold = 0.8)
         # Extract relevant documents from the response content
-        docs = response.choices[
-            0
-        ].message.content  # Adjust this based on the actual response structure
-
-        # Append the result to the list
-        results.append({"Question number": question_number, "Generated Docs": docs})
+        # docs = response.choices[0].message.content  # Adjust this based on the actual response structure
+        # Iterate over the output to extract chunk details
+        for chunk in output:
+            file_name, chunk_text, page_number, position , similarity = chunk
+            # Append the result to the list
+            results.append({
+                'Question number': question_number,
+                'Question': question,
+                'Retrieved FileName': file_name,
+                'Chunk Text': chunk_text,
+                'Page Number': page_number,
+                'Position': position,
+                'Similarity': similarity
+            })
 
     # Convert the results to a DataFrame
-    results_df = pd.DataFrame(results, columns=["Question number", "Generated Docs"])
-
+    results_df = pd.DataFrame(results, columns=[
+        'Question number', 'Question', 'Retrieved FileName', 'Chunk Text', 'Page Number', 'Position' , 'Similarity'
+    ])
+    #fileNames_df = pd.DataFrame(list(filenames), columns=['FileName'])
     return results_df
 
 
