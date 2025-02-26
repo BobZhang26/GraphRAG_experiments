@@ -1,13 +1,16 @@
-"""This is a library module for graph RAG which will contain helper 
+"""This is a library module for graph RAG which will contain helper
 functions for the graph RAG module."""
 
-from sentence_transformers import SentenceTransformer
-from openai import OpenAI
-from dotenv import load_dotenv
+import json
+from sentence_transformers import SentenceTransformer # type: ignore
+from openai import OpenAI # type: ignore
+from dotenv import load_dotenv # type: ignore
 import os
 import ast
-import pandas as pd
+import pandas as pd # type: ignore
 from typing import Tuple, List
+from typing import List, Tuple, Dict, Optional
+import logging
 
 
 def embed_entity(entity):
@@ -37,20 +40,24 @@ def create_vector_index(graph, name):
     Returns:
       None
     """
-     # Check if the index exists and retrieve dimensions
+    # Check if the index exists and retrieve dimensions
     existing_indexes = graph.query(
         f"SHOW INDEXES YIELD name, type, options WHERE name = '{name}' AND type = 'VECTOR'"
     )
 
     if existing_indexes:
-        current_options = existing_indexes[0]['options']
-        current_dimensions = current_options.get('vector.dimensions', None)
+        current_options = existing_indexes[0]["options"]
+        current_dimensions = current_options.get("vector.dimensions", None)
 
         if current_dimensions == 384:
-            print(f"✅ Index '{name}' already exists with correct dimensions: {current_dimensions}")
+            print(
+                f"✅ Index '{name}' already exists with correct dimensions: {current_dimensions}"
+            )
             return  # No need to drop and recreate
 
-        print(f"Index '{name}' exists but has incorrect dimensions: {current_dimensions}. Recreating...")
+        print(
+            f"Index '{name}' exists but has incorrect dimensions: {current_dimensions}. Recreating..."
+        )
         graph.query(f"DROP INDEX `{name}` IF EXISTS")
 
     graph.query(f"DROP INDEX `{name}` IF EXISTS")
@@ -100,7 +107,7 @@ def chunk_finder(graph, query):
     query_embedding = embed_entity(query)
     response = vector_search(graph, query_embedding)
     id = response[0]["node.id"]
-    
+
     chunk_find_query = f"""
     MATCH (n:Chunk)-[r]->(m:`__Entity__` {{id: "{id}"}}) RETURN n.text,n.fileName LIMIT 80
     """
@@ -108,18 +115,18 @@ def chunk_finder(graph, query):
     output = []
     for record in result:
         output.append((record["n.fileName"], record["n.text"]))
-    return output , response
+    return output, response
 
 
 def get_entities(prompt: str, correction_context: str = " ") -> Tuple[List[str], str]:
     """
     Extract medical entities from text using OpenAI's models.
     API key is loaded from .env file.
-    
+
     Args:
         prompt: Input text to extract entities from
         correction_context: Additional context for correction if needed
-        
+
     Returns:
         Tuple containing list of extracted entities and correction context
     """
@@ -127,9 +134,9 @@ def get_entities(prompt: str, correction_context: str = " ") -> Tuple[List[str],
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in .env file")
-    
+
     client = OpenAI(api_key=api_key)
-    
+
     system_prompt = """
     You are a highly capable natural language processing assistant with extensive medical knowledge. 
     Your task is to extract medical entities from a given prompt. 
@@ -137,37 +144,44 @@ def get_entities(prompt: str, correction_context: str = " ") -> Tuple[List[str],
     Please output the entities as a list of strings in the format ["string 1", "string 2"]. Do not include duplicates. 
     Do not include any other text. Always include at least one entity.
     """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": correction_context},
-                {"role": "user", "content": f"Here is the input prompt:\n{prompt}\n\nExtracted entities:"}
+                {
+                    "role": "user",
+                    "content": f"Here is the input prompt:\n{prompt}\n\nExtracted entities:",
+                },
             ],
-            temperature=0.1
+            temperature=0.1,
         )
-        
+
         output = response.choices[0].message.content.strip()
-        
+
         try:
             entities = ast.literal_eval(output)
             if not isinstance(entities, list):
                 correction_string = f"The previous output threw this error: Expected a list of strings, but got {type(entities)} with value {entities}"
                 return get_entities(prompt, correction_context=correction_string)
-            
+
             if not all(isinstance(item, str) for item in entities):
-                correction_string = f"The previous output contained non-string elements: {entities}"
+                correction_string = (
+                    f"The previous output contained non-string elements: {entities}"
+                )
                 return get_entities(prompt, correction_context=correction_string)
-            
+
             return entities, correction_context
-            
+
         except (ValueError, SyntaxError) as e:
             print(f"Error parsing response: {e}")
             print(f"Raw response was: {output}")
-            return get_entities(prompt, correction_context=f"Previous response was invalid: {e}")
-            
+            return get_entities(
+                prompt, correction_context=f"Previous response was invalid: {e}"
+            )
+
     except Exception as e:
         print(f"API Error: {e}")
         return ["error occurred"], correction_context
@@ -178,7 +192,9 @@ def graph_retriever(graph, query):
     ids = []
     for entity in entities:
         embedding = embed_entity(entity)
-        closest_node = vector_search(graph, embedding, k=1) # considering only the closest node
+        closest_node = vector_search(
+            graph, embedding, k=1
+        )  # considering only the closest node
         id = closest_node[0]["node.id"]
         ids.append(id)
     context = ""
@@ -288,7 +304,7 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
     # response = ollama.generate(model="llama3.1:latest", prompt=prompt)
     # Initialize the client
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    
+
     # Assuming 'prompt' is defined elsewhere in your code
     # If not, you'll need to define it
     try:
@@ -297,16 +313,15 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
             messages=[
                 {"role": "system", "content": prompt},  # Make sure 'prompt' is defined
                 {"role": "user", "content": query},
-            ]
+            ],
         )
         return response, context  # Make sure 'context' is defined
-        
+
     except Exception as e:
         print(f"Error during API call: {e}")
         return None, None
 
-
-#def run_trial(graph, question_list, num_trials=1):
+    # def run_trial(graph, question_list, num_trials=1):
     """
     This function will run a trial of questions and return the results
 
@@ -346,8 +361,7 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
     )
     return results
 
-
-#def create_md(csv_path, output_path, questions):
+    # def create_md(csv_path, output_path, questions):
     """
     This function will convert a trial csv into md for evaluation
 
@@ -379,32 +393,18 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(markdown_content))
 
+
 ############################################################################################################
 # NEW CHUNCK FINDER FUNCTIONS
 ############################################################################################################
-from typing import List, Tuple, Dict, Optional
-import logging
 
 def enhanced_chunk_finder(
     graph,
     query: str,
-    limit: int = 8,
+    limit: int = 20,
     similarity_threshold: float = 0.8,
-    max_hops: int = 2
-) -> List[Tuple[str, str]]:
-    """
-    Retrieves relevant chunks by combining vector search with graph traversal.
-    
-    Args:
-        graph: The graph database connection
-        query: The search query string
-        limit: Maximum number of chunks to return
-        similarity_threshold: Minimum similarity score for vector search results
-        max_hops: Maximum number of relationship hops to traverse in the graph
-        
-    Returns:
-        List of tuples containing (filename, chunk_text)
-    """
+    max_hops: int = 1
+) -> List[Tuple[str, str, int, int, float]]:
     try:
         # Get query embedding and perform vector search
         query_embedding = embed_entity(query)
@@ -412,64 +412,90 @@ def enhanced_chunk_finder(
         
         if not vector_results:
             logging.warning("No vector search results found for query")
-            return []
+            return [], []
             
-        # Filter vector results by similarity threshold
-        relevant_ids = [
-            result["node.id"] 
-            for result in vector_results 
-            if result.get("score", 0) >= similarity_threshold
-        ]
+        # Create a dictionary to store entity IDs and their similarity scores
+        similarity_scores = dict(
+            sorted(
+                {
+                    result["node.id"]: result["score"]
+                    for result in vector_results
+                    if result.get("score", 0) >= similarity_threshold
+                }.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+        )
         
-        if not relevant_ids:
+        if not similarity_scores:
             logging.info("No results met the similarity threshold")
-            return []
+            return [], []
             
         # Construct graph query to find connected chunks
-        ids_clause = ", ".join([f'"{id}"' for id in relevant_ids])
+        # ids_clause = ", ".join([f'"{id}"' for id in similarity_scores.keys()])
+        
+        # Create parameters dictionary for the query
+        params = {
+            "similarity_scores": similarity_scores,
+            "ids": list(similarity_scores.keys()),
+            "limit": limit
+        }
+        
+        # Use f-string for max_hops since it can't be parameterized in relationship patterns
         chunk_find_query = f"""
         MATCH path = (n:Chunk)-[*1..{max_hops}]->(m:`__Entity__`)
-        WHERE m.id IN [{ids_clause}]
-        WITH n, path
-        WITH n, min(length(path)) as distance
-        ORDER BY distance
-        RETURN DISTINCT n.text, n.fileName
-        LIMIT {limit}
+        WHERE m.id IN $ids
+        WITH n, path, m
+        WITH n, min(length(path)) as distance, m
+        WITH n, distance, m.id as entity_id
+        WITH n, distance, entity_id, 
+             CASE 
+                WHEN entity_id IN $ids 
+                THEN $similarity_scores[entity_id]
+             END as similarity
+        ORDER BY similarity DESC, distance
+        RETURN n.text, n.fileName, n.page_number, n.position, entity_id, similarity
+        LIMIT $limit
         """
         
-        # Execute graph query
-        result = graph.query(chunk_find_query)
-        
+        # Execute graph query with parameters
+        result = graph.query(chunk_find_query, params=params)
+        # save the result in a json file
+        # with open('./outputs/all_retrieval_results.json', 'w') as f:
+        #     json.dump(result, f)
         # Process results
         output = []
-        seen_chunks = set()  # Avoid duplicates
-        filenames = set()  # Avoid multiple chunks from the same file
+        seen_chunks = set()
+        filenames = set()
         
         for record in result:
             chunk_text = record["n.text"]
             filenames.add(record["n.fileName"])
             if chunk_text not in seen_chunks:
-                output.append((record["n.fileName"], chunk_text))
+                output.append((
+                    record["n.fileName"],
+                    chunk_text,
+                    record["n.page_number"],
+                    record["n.position"],
+                    record["similarity"]
+                ))
                 seen_chunks.add(chunk_text)
                 
-        return list(filenames) , output
+        return list(filenames), output
         
     except Exception as e:
         logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
         raise
 
 
-def get_chunk_metadata(
-    graph,
-    chunk_ids: List[str]
-) -> Dict[str, Dict]:
+def get_chunk_metadata(graph, chunk_ids: List[str]) -> Dict[str, Dict]:
     """
     Helper function to retrieve additional metadata for chunks.
-    
+
     Args:
         graph: The graph database connection
         chunk_ids: List of chunk IDs to query
-        
+
     Returns:
         Dictionary mapping chunk IDs to their metadata
     """
@@ -477,18 +503,17 @@ def get_chunk_metadata(
     metadata_query = f"""
     MATCH (n:Chunk)
     WHERE n.id IN [{ids_clause}]
-    RETURN n.id, n.created, n.lastModified, n.author, n.version
+    RETURN n.id, n.fileName, n.page_number, n.position
     """
-    
+
     result = graph.query(metadata_query)
-    
+
     metadata = {}
     for record in result:
         metadata[record["n.id"]] = {
-            "created": record["n.created"],
-            "lastModified": record["n.lastModified"],
-            "author": record["n.author"],
-            "version": record["n.version"]
+            "fileName": record["n.fileName"],
+            "page_number": record["n.page_number"],
+            "position": record["n.position"],
         }
-        
+
     return metadata

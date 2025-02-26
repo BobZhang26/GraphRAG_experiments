@@ -92,6 +92,32 @@ This project is focused on experiments with Graph-based Retrieval-Augmented Gene
 - **Jupyter and IPython**: Interactive computing.
 - **GitHub Actions**: Continuous integration and deployment.
 
+## Project Structure
+```
+Directory structure:
+└── bobzhang26-graphrag_experiments/
+    ├── README.md
+    ├── Dockerfile
+    ├── LICENSE
+    ├── Makefile
+    ├── annotation.ipynb
+    ├── conn.py
+    ├── graph_based_rag.ipynb
+    ├── libs.py
+    ├── main.py
+    ├── mylib.py
+    ├── requirements.txt
+    ├── retrieve.ipynb
+    ├── test.py
+    ├── test_main.py
+    ├── .devcontainer/
+    │   ├── Dockerfile
+    │   └── devcontainer.json
+    └── .github/
+        └── workflows/
+            └── cicd.yml
+```
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
