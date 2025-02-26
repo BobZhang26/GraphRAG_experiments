@@ -1,9 +1,9 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from sklearn.metrics import precision_score, recall_score, accuracy_score
-from dotenv import load_dotenv
+import gspread # type: ignore
+from oauth2client.service_account import ServiceAccountCredentials # type: ignore
+from sklearn.metrics import precision_score, recall_score, accuracy_score # type: ignore
+from dotenv import load_dotenv # type: ignore
 import os
-import pandas as pd
+import pandas as pd # type: ignore
 from libs import enhanced_chunk_finder
 
 
@@ -181,3 +181,12 @@ def apply_metric(concatenated_df):
     concatenated_df["Precision"] = metrics.apply(lambda metric: metric[1])
     concatenated_df["Recall"] = metrics.apply(lambda metric: metric[2])
     return concatenated_df
+
+def get_avg_similarity_df(df):
+    # Concatenate the retrieved files for each question
+    avg_similarity_df = df.groupby(['Question number', 'Question']).agg({
+    'Retrieved FileName': lambda x: list(set(x)),  # Get unique filenames
+    'Similarity': 'mean'  # Average similarity score
+    }).reset_index()
+    avg_similarity_df.columns = ['Question Number', 'Question', 'Retrieved Files', 'Avg Similarity']
+    return avg_similarity_df

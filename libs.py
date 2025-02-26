@@ -1,13 +1,15 @@
 """This is a library module for graph RAG which will contain helper
 functions for the graph RAG module."""
 
-from sentence_transformers import SentenceTransformer
-from openai import OpenAI
-from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer # type: ignore
+from openai import OpenAI # type: ignore
+from dotenv import load_dotenv # type: ignore
 import os
 import ast
-import pandas as pd
+import pandas as pd # type: ignore
 from typing import Tuple, List
+from typing import List, Tuple, Dict, Optional
+import logging
 
 
 def embed_entity(entity):
@@ -394,9 +396,6 @@ def generate_response(graph, query, method="hybrid", model="gpt-4-turbo"):
 ############################################################################################################
 # NEW CHUNCK FINDER FUNCTIONS
 ############################################################################################################
-from typing import List, Tuple, Dict, Optional
-import logging
-
 
 def enhanced_chunk_finder(
     graph,
