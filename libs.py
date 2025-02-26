@@ -402,7 +402,7 @@ def enhanced_chunk_finder(
     query: str,
     limit: int = 20,
     similarity_threshold: float = 0.8,
-    max_hops: int = 2
+    max_hops: int = 1
 ) -> List[Tuple[str, str, int, int, float]]:
     try:
         # Get query embedding and perform vector search
