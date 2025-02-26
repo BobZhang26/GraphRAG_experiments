@@ -1,6 +1,7 @@
 """This is a library module for graph RAG which will contain helper
 functions for the graph RAG module."""
 
+import json
 from sentence_transformers import SentenceTransformer # type: ignore
 from openai import OpenAI # type: ignore
 from dotenv import load_dotenv # type: ignore
@@ -459,7 +460,9 @@ def enhanced_chunk_finder(
         
         # Execute graph query with parameters
         result = graph.query(chunk_find_query, params=params)
-        
+        # save the result in a json file
+        # with open('./outputs/all_retrieval_results.json', 'w') as f:
+        #     json.dump(result, f)
         # Process results
         output = []
         seen_chunks = set()

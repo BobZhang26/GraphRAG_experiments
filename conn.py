@@ -1,3 +1,4 @@
+import json
 import gspread # type: ignore
 from oauth2client.service_account import ServiceAccountCredentials # type: ignore
 from sklearn.metrics import precision_score, recall_score, accuracy_score # type: ignore
@@ -46,6 +47,8 @@ def retrieval_rel_docs (graph, questions, top_k=5):
         # Extract relevant documents from the response content
         # docs = response.choices[0].message.content  # Adjust this based on the actual response structure
         # Iterate over the output to extract chunk details
+        # save output to a json file
+        
         for chunk in output:
             file_name, chunk_text, page_number, position , similarity = chunk
             # Append the result to the list
@@ -63,6 +66,9 @@ def retrieval_rel_docs (graph, questions, top_k=5):
     results_df = pd.DataFrame(results, columns=[
         'Question number', 'Question', 'Retrieved FileName', 'Chunk Text', 'Page Number', 'Position' , 'Similarity'
     ])
+    # with open('./outputs/all_retrieval_results.json', 'w') as f:
+    #         json.dump(results, f)
+    results_df.to_csv('./outputs/all_retrieval_results.csv', index=False)
     #fileNames_df = pd.DataFrame(list(filenames), columns=['FileName'])
     return results_df
 
@@ -105,7 +111,7 @@ def get_concatenate_df(results_df, relevant_docs_df, topk):
 
         # Ensure the DataFrames have the necessary columns
         if (
-            "Generated Docs" not in results_df.columns
+            "Retrieved Files" not in results_df.columns
             or "Relevant Docs" not in relevant_docs_df.columns
         ):
             raise ValueError(
@@ -121,7 +127,7 @@ def get_concatenate_df(results_df, relevant_docs_df, topk):
         if (
             "Question" not in concatenated_df.columns
             or "Relevant Docs" not in concatenated_df.columns
-            or "Generated Docs" not in concatenated_df.columns
+            or "Retrieved Files" not in concatenated_df.columns
         ):
             raise ValueError(
                 "The concatenated DataFrame must contain the necessary columns: 'Question', 'Relevant Docs', and 'Generated Docs'."
