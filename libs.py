@@ -1,14 +1,11 @@
 """This is a library module for graph RAG which will contain helper
 functions for the graph RAG module."""
 
-import json
 from sentence_transformers import SentenceTransformer # type: ignore
 from openai import OpenAI # type: ignore
-from dotenv import load_dotenv # type: ignore
 import os
 import ast
 import pandas as pd # type: ignore
-from typing import Tuple, List
 from typing import List, Tuple, Dict, Optional
 import logging
 
@@ -64,12 +61,12 @@ def create_vector_index(graph, name):
     graph.query(f"DROP INDEX `{name}` IF EXISTS")
     graph.query(
         f"""
-    CREATE VECTOR INDEX `{name}`
-    FOR (a:__Entity__) ON (a.embedding)
-    OPTIONS {{
-      indexConfig: {{
-        `vector.dimensions`: 384,
-        `vector.similarity_function`: 'cosine'
+        CREATE VECTOR INDEX `{name}` IF NOT EXISTS  
+        FOR (a:__Entity__) ON (a.embedding)
+        OPTIONS {{
+        indexConfig: {{
+            `vector.dimensions`: 384,
+            `vector.similarity_function`: 'cosine'
       }}
     }}
     """
@@ -90,7 +87,7 @@ def vector_search(graph, query_embedding, index_name="entities", k=50):
       result: list, list of tuples containing the node id and the similarity score
     """
     similarity_query = f"""
-    MATCH (n:`__Entity__`)
+    MATCH (n:__Entity__)
     CALL db.index.vector.queryNodes('{index_name}', {k}, {query_embedding})
     YIELD node, score
     RETURN DISTINCT node.id, score
@@ -461,10 +458,7 @@ def enhanced_chunk_finder(
         
         # Execute graph query with parameters
         result = graph.query(chunk_find_query, params=params)
-        # save the result in a json file
-        # with open('./outputs/all_retrieval_results.json', 'w') as f:
-        #     json.dump(result, f)
-        # Process results
+       
         output = []
         seen_chunks = set()
         filenames = set()
@@ -488,33 +482,3 @@ def enhanced_chunk_finder(
         logging.error(f"Error in enhanced_chunk_finder: {str(e)}")
         raise
 
-
-def get_chunk_metadata(graph, chunk_ids: List[str]) -> Dict[str, Dict]:
-    """
-    Helper function to retrieve additional metadata for chunks.
-
-    Args:
-        graph: The graph database connection
-        chunk_ids: List of chunk IDs to query
-
-    Returns:
-        Dictionary mapping chunk IDs to their metadata
-    """
-    ids_clause = ", ".join([f"'{id}'" for id in chunk_ids])
-    metadata_query = f"""
-    MATCH (n:Chunk)
-    WHERE n.id IN [{ids_clause}]
-    RETURN n.id, n.fileName, n.page_number, n.position
-    """
-
-    result = graph.query(metadata_query)
-
-    metadata = {}
-    for record in result:
-        metadata[record["n.id"]] = {
-            "fileName": record["n.fileName"],
-            "page_number": record["n.page_number"],
-            "position": record["n.position"],
-        }
-
-    return metadata
