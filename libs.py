@@ -46,7 +46,6 @@ def create_vector_index(graph, name):
         current_options = existing_indexes[0]["options"]
         indexConfig = current_options.get("indexConfig", None)
         current_dimensions = indexConfig.get("vector.dimensions", None)
-       
 
         if current_dimensions == 384:
             print(
