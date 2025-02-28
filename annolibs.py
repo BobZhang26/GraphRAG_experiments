@@ -80,33 +80,62 @@ def compare_embeddings(question: str, paper: str, top_k: int = 5) -> pd.DataFram
     Returns:
         DataFrame with top matching chunks and similarity scores
     """
+    # Create empty DataFrame with expected columns
+    empty_df = pd.DataFrame(columns=['paper_name', 'position', 'chunk_text', 'similarity_score'])
+    
     # Load chunk embeddings from CSV
     csv_path = f"./chunks_of_paper/chunks_of_{paper}.csv"
     if not os.path.exists(csv_path):
         print(f"No chunk data found for paper: {paper}")
-        return pd.DataFrame()
+        return empty_df
     
-    # Load chunks DataFrame
-    chunks_df = pd.read_csv(csv_path)
+    try:
+        # Load chunks DataFrame
+        chunks_df = pd.read_csv(csv_path)
+        
+        # Get question embedding
+        question_embedding = embed_entity(question)
+        
+        # Convert string embeddings back to lists with error handling
+        def safe_convert_embedding(emb_str):
+            try:
+                return ast.literal_eval(emb_str)
+            except (ValueError, SyntaxError):
+                return None
+        
+        chunks_df['chunk_embedding'] = chunks_df['chunk_embedding'].apply(safe_convert_embedding)
+        
+        # Remove invalid embeddings
+        chunks_df = chunks_df[chunks_df['chunk_embedding'].notna()]
+        
+        if chunks_df.empty:
+            print(f"No valid embeddings found in {paper}")
+            return empty_df
+        
+        # Calculate cosine similarities with error handling
+        similarities = []
+        for _, row in chunks_df.iterrows():
+            try:
+                chunk_emb = np.array(row['chunk_embedding'])
+                q_emb = np.array(question_embedding)
+                similarity = np.dot(chunk_emb, q_emb) / (np.linalg.norm(chunk_emb) * np.linalg.norm(q_emb))
+                similarities.append(similarity)
+            except:
+                similarities.append(0.0)
+        
+        # Add similarities to DataFrame
+        chunks_df['similarity_score'] = similarities
+        
+        # Sort and get top k results
+        results = chunks_df.nlargest(top_k, 'similarity_score')[
+            ['paper_name', 'position', 'chunk_text', 'similarity_score']
+        ].round({'similarity_score': 4})
+        
+        # Set display options for full text visibility
+        pd.set_option('display.max_colwidth', None)
+        
+        return results
     
-    # Get question embedding
-    question_embedding = embed_entity(question)
-    
-    # Convert string embeddings back to lists
-    chunks_df['chunk_embedding'] = chunks_df['chunk_embedding'].apply(ast.literal_eval)
-    
-    # Calculate cosine similarities
-    similarities = chunks_df['chunk_embedding'].apply(
-        lambda x: np.dot(x, question_embedding) / 
-        (np.linalg.norm(x) * np.linalg.norm(question_embedding))
-    )
-    
-    # Add similarities to DataFrame
-    chunks_df['similarity_score'] = similarities.round(4)
-    
-    # Sort and get top k results
-    results = chunks_df.nlargest(top_k, 'similarity_score')[
-        ['paper_name', 'position', 'chunk_text','similarity_score']
-    ]
-    
-    return results
+    except Exception as e:
+        print(f"Error processing paper {paper}: {str(e)}")
+        return empty_df
