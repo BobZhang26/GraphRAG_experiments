@@ -60,7 +60,7 @@ def get_all_chunks_per_paper(
             os.makedirs(output_dir, exist_ok=True)
             csv_path = f"{output_dir}/chunks_of_{paper}.csv"
             df_paper.to_csv(csv_path, index=False)
-            print(f"Saved {csv_path}")
+            #print(f"Saved {csv_path}")
         
         # Store DataFrame in dictionary
         paper_dataframes[paper] = df_paper
