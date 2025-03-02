@@ -1,10 +1,10 @@
 import json
-import gspread # type: ignore
-from oauth2client.service_account import ServiceAccountCredentials # type: ignore
-from sklearn.metrics import precision_score, recall_score, accuracy_score # type: ignore
-from dotenv import load_dotenv # type: ignore
+import gspread  # type: ignore
+from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
+from sklearn.metrics import precision_score, recall_score, accuracy_score  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 import os
-import pandas as pd # type: ignore
+import pandas as pd  # type: ignore
 from libs import enhanced_chunk_finder
 
 
@@ -32,55 +32,72 @@ def get_relevant_documents(df, question):
 
 
 # Function to retrieve relevant documents for a specific question
-def retrieval_rel_docs (graph, questions, top_k=5):
+def retrieval_rel_docs(
+    graph, questions, top_k=5, limit=20, similarity_threshold=0.8, max_hops=1
+):
     top_k_questions = questions.head(top_k)
     # Initialize a list to store the results
     results = []
     # Iterate over the top k questions
     for index, row in top_k_questions.iterrows():
         question_number = index + 1  # Assuming the question number is the index + 1
-        question = row['Question']  # Replace 'Question' with the actual column name for questions in df_MedQ
-        
+        question = row[
+            "Question"
+        ]  # Replace 'Question' with the actual column name for questions in df_MedQ
+
         # Generate response for the question
         # context = context_builder(graph, question, method="vector")
-        filenames , output = enhanced_chunk_finder(graph, question,similarity_threshold = 0.8)
+        filenames, output = enhanced_chunk_finder(
+            graph, question, limit=20, similarity_threshold=0.8, max_hops=1
+        )
         # Extract relevant documents from the response content
         # docs = response.choices[0].message.content  # Adjust this based on the actual response structure
         # Iterate over the output to extract chunk details
         # save output to a json file
-        
+
         for chunk in output:
-            file_name, chunk_text, page_number, position , similarity = chunk
+            file_name, chunk_text, page_number, position, similarity = chunk
             # Append the result to the list
-            results.append({
-                'Question number': question_number,
-                'Question': question,
-                'Retrieved FileName': file_name,
-                'Chunk Text': chunk_text,
-                'Page Number': page_number,
-                'Position': position,
-                'Similarity': similarity
-            })
+            results.append(
+                {
+                    "Question number": question_number,
+                    "Question": question,
+                    "Retrieved FileName": file_name,
+                    "Chunk Text": chunk_text,
+                    "Page Number": page_number,
+                    "Position": position,
+                    "Similarity": similarity,
+                }
+            )
 
     # Convert the results to a DataFrame
-    results_df = pd.DataFrame(results, columns=[
-        'Question number', 'Question', 'Retrieved FileName', 'Chunk Text', 'Page Number', 'Position' , 'Similarity'
-    ])
+    results_df = pd.DataFrame(
+        results,
+        columns=[
+            "Question number",
+            "Question",
+            "Retrieved FileName",
+            "Chunk Text",
+            "Page Number",
+            "Position",
+            "Similarity",
+        ],
+    )
     # with open('./outputs/all_retrieval_results.json', 'w') as f:
     #         json.dump(results, f)
-    results_df.to_csv('./outputs/all_retrieval_results.csv', index=False)
-    #fileNames_df = pd.DataFrame(list(filenames), columns=['FileName'])
+    results_df.to_csv("./outputs/all_retrieval_results.csv", index=False)
+    # fileNames_df = pd.DataFrame(list(filenames), columns=['FileName'])
     return results_df
 
 
 # Function to clean and format the text
 def clean_text(text):
-    if not isinstance(text, str):
+    if not isinstance(text, list):
         return ""
     # Remove unwanted characters and whitespace
     text = text.strip()
     # Remove '[]' and " " characters
-    text = text.replace("[", "").replace("]", "").replace("'", "").replace('"', "")
+    #text = text.replace("[", "").replace("]", "").replace("'", "").replace('"', "")
     # Remove commas
     text = text.replace(",", "")
     # remove ending with .pdf
@@ -188,11 +205,23 @@ def apply_metric(concatenated_df):
     concatenated_df["Recall"] = metrics.apply(lambda metric: metric[2])
     return concatenated_df
 
+
 def get_avg_similarity_df(df):
     # Concatenate the retrieved files for each question
-    avg_similarity_df = df.groupby(['Question number', 'Question']).agg({
-    'Retrieved FileName': lambda x: list(set(x)),  # Get unique filenames
-    'Similarity': 'mean'  # Average similarity score
-    }).reset_index()
-    avg_similarity_df.columns = ['Question Number', 'Question', 'Retrieved Files', 'Avg Similarity']
+    avg_similarity_df = (
+        df.groupby(["Question number", "Question"])
+        .agg(
+            {
+                "Retrieved FileName": lambda x: list(set(x)),  # Get unique filenames
+                "Similarity": "mean",  # Average similarity score
+            }
+        )
+        .reset_index()
+    )
+    avg_similarity_df.columns = [
+        "Question Number",
+        "Question",
+        "Retrieved Files",
+        "Avg Similarity",
+    ]
     return avg_similarity_df
