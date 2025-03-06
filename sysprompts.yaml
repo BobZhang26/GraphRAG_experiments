@@ -67,12 +67,13 @@ PICO_synthesis:
     ### Basic Study Information
     - **Authors**: Provide the first author’s last name followed by “et al.” (e.g., "Smith et al.").
     - **Year**: Indicate the year of publication.
-    - **Title**: Include the 'filename' from the firstk_chunks_prompt.
+    - **Title**: Include the 'filename' from the 'firstk_chunks_prompt'.
     - **Journal**: Specify the journal or source of the study. 
     - **Research Question**: State the main hypothesis or question the study addresses (e.g., "Does Drug X improve survival in patients with Condition Y?").
 
     ### Study Design and Methodology
     - **Type of Study**: Indicate if it is an RCT, Cohort Study, Meta-analysis, etc.
+
     - **Methodology**:
       - **Detailed Description**: Explain how participants were selected, enrolled, and assigned to groups.
       - **Randomization Technique**: Describe the method (e.g., computer-generated sequence).
