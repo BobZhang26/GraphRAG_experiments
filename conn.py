@@ -51,7 +51,7 @@ def retrieval_rel_docs(
         # Generate response for the question
         # context = context_builder(graph, question, method="vector")
         filenames, output = enhanced_chunk_finder(
-            graph, question, limit=20, similarity_threshold=0.8, max_hops=1
+            graph, question, limit=limit, similarity_threshold=similarity_threshold, max_hops=max_hops
         )
         # Extract relevant documents from the response content
         # docs = response.choices[0].message.content  # Adjust this based on the actual response structure
