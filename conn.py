@@ -211,7 +211,10 @@ def calculate_metrics(reference, candidate):
         else 0
     )
 
-    return accuracy, precision, recall
+    F_one = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+
+    return accuracy, precision, recall , F_one
 
 
 def apply_metrics(concatenated_df):
@@ -224,6 +227,7 @@ def apply_metrics(concatenated_df):
     concatenated_df["Accuracy"] = metrics.apply(lambda metric: metric[0])
     concatenated_df["Precision"] = metrics.apply(lambda metric: metric[1])
     concatenated_df["Recall"] = metrics.apply(lambda metric: metric[2])
+    concatenated_df["F1"] = metrics.apply(lambda metric: metric[3])
     return concatenated_df
 
 
@@ -286,6 +290,7 @@ def plot_metrics_and_roc(df, score_column='Avg Similarity',threshold = 0.8):
         'Accuracy': df['Accuracy'].mean(),
         'Precision': df['Precision'].mean(),
         'Recall': df['Recall'].mean(),
+        'F1': df['F1'].mean(),
         'AUC': roc_auc
     }
     
