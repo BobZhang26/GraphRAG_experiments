@@ -169,7 +169,7 @@ def get_firstk_chunks(graph, filenames: List[str], firstk: int = 12) -> List[Dic
         # Query to get first k chunks for the file
         query = """
         MATCH (c:Chunk)
-        WHERE c.fileName = $filename
+        WHERE c.fileName = $filename AND c.position >= 5
         WITH c
         ORDER BY c.position
         LIMIT $k
@@ -275,7 +275,7 @@ def synthesize_response(
 
     final_context, filenames = final_context_builder(graph, query, method)
     system_prompt = load_prompt_template(synth_type)
-    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=12)
+    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=10)
 
     prompt = f"""{system_prompt}
     
@@ -330,7 +330,7 @@ if __name__ == "__main__":  # Fixed syntax error (== instead of =)
         graph=graph,
         query=test_query,
         method="hybrid",
-        sythn_type="stance_synthesis",
+        synth_type="stance_synthesis",
         model="gpt-3.5-turbo",
     )
     if response_hybrid and hasattr(response_hybrid, "choices"):
@@ -342,7 +342,7 @@ if __name__ == "__main__":  # Fixed syntax error (== instead of =)
         graph=graph,
         query=test_query,
         method="vector",
-        sythn_type="stance_synthesis",
+        synth_type="stance_synthesis",
         model="gpt-3.5-turbo",
     )
     if response_vector and hasattr(response_vector, "choices"):
