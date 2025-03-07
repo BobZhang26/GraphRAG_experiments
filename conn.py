@@ -51,7 +51,11 @@ def retrieval_rel_docs(
         # Generate response for the question
         # context = context_builder(graph, question, method="vector")
         filenames, output = enhanced_chunk_finder(
-            graph, question, limit=20, similarity_threshold=0.8, max_hops=1
+            graph,
+            question,
+            limit=limit,
+            similarity_threshold=similarity_threshold,
+            max_hops=max_hops,
         )
         # Extract relevant documents from the response content
         # docs = response.choices[0].message.content  # Adjust this based on the actual response structure
@@ -100,31 +104,29 @@ def clean_retrieved_files(df: pd.DataFrame) -> pd.DataFrame:
     1. Removing .pdf extensions
     2. Converting lists to strings
     3. Removing extra quotes and spaces
-    
+
     Args:
         df: DataFrame containing 'Retrieved Files' column
-        
+
     Returns:
         DataFrame with cleaned 'Retrieved Files' column
     """
     # Make a copy to avoid modifying original DataFrame
     df = df.copy()
-    
+
     # Remove .pdf extensions from each element in lists
-    df['Retrieved Files'] = df['Retrieved Files'].apply(
+    df["Retrieved Files"] = df["Retrieved Files"].apply(
         lambda x: [elem.replace(".pdf", "") for elem in x]
     )
-    
+
     # Convert lists to strings and remove brackets
-    df['Retrieved Files'] = df['Retrieved Files'].apply(
-        lambda x: str(x).strip('[]')
-    )
-    
+    df["Retrieved Files"] = df["Retrieved Files"].apply(lambda x: str(x).strip("[]"))
+
     # Remove quotes and clean up spaces
-    df['Retrieved Files'] = df['Retrieved Files'].apply(
+    df["Retrieved Files"] = df["Retrieved Files"].apply(
         lambda x: x.replace("'", "").replace('"', "").strip()
     )
-    
+
     return df
 
 
@@ -154,7 +156,8 @@ def get_concatenate_df(results_df, relevant_docs_df, topk):
 
         # Concatenate results_df with relevant_docs_df side by side based on their index
         concatenated_df = pd.concat(
-            [results_df.iloc[:topk], relevant_docs_df.iloc[:topk]], axis=1)
+            [results_df.iloc[:topk], relevant_docs_df.iloc[:topk]], axis=1
+        )
 
         # Ensure the concatenated DataFrame has the necessary columns
         if (
@@ -166,9 +169,8 @@ def get_concatenate_df(results_df, relevant_docs_df, topk):
                 "The concatenated DataFrame must contain the necessary columns: 'Question', 'Relevant Docs', and 'Generated Docs'."
             )
 
-
         concatenated_df = concatenated_df[
-            ["Question Number" , "Question", "Docs", "Retrieved Files","Avg Similarity"]
+            ["Question Number", "Question", "Docs", "Retrieved Files", "Avg Similarity"]
         ]
 
         # Clean the 'Retrieved Files' column
@@ -211,10 +213,13 @@ def calculate_metrics(reference, candidate):
         else 0
     )
 
-    F_one = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    F_one = (
+        2 * (precision * recall) / (precision + recall)
+        if (precision + recall) > 0
+        else 0
+    )
 
-
-    return accuracy, precision, recall , F_one
+    return accuracy, precision, recall, F_one
 
 
 def apply_metrics(concatenated_df):
@@ -251,10 +256,11 @@ def get_avg_similarity_df(df):
     ]
     return avg_similarity_df
 
-def plot_metrics_and_roc(df, score_column='Avg Similarity',threshold = 0.8):
+
+def plot_metrics_and_roc(df, score_column="Avg Similarity", threshold=0.8):
     """
     Plot ROC curve and display metrics.
-    
+
     Args:
         df: DataFrame containing predictions and true labels
         score_column: Column name for similarity scores
@@ -263,42 +269,43 @@ def plot_metrics_and_roc(df, score_column='Avg Similarity',threshold = 0.8):
     # Set style
     sns.set_style("whitegrid")
     plt.figure(figsize=(12, 6))
-    
+
     # Create subplot for ROC curve
     plt.subplot(1, 2, 1)
-    
+
     # Calculate ROC curve
     y_true = (df[score_column] > threshold).astype(int)
     y_scores = df[score_column]
     fpr, tpr, _ = roc_curve(y_true, y_scores)
     roc_auc = auc(fpr, tpr)
-    
+
     # Plot ROC curve
-    plt.plot(fpr, tpr, color='darkorange', lw=2,
-             label=f'ROC curve (AUC = {roc_auc:.3f})')
-    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.plot(
+        fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.3f})"
+    )
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic')
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("Receiver Operating Characteristic")
     plt.legend(loc="lower right")
-    
+
     # Create subplot for metrics
     plt.subplot(1, 2, 2)
     metrics = {
-        'Accuracy': df['Accuracy'].mean(),
-        'Precision': df['Precision'].mean(),
-        'Recall': df['Recall'].mean(),
-        'F1': df['F1'].mean(),
-        'AUC': roc_auc
+        "Accuracy": df["Accuracy"].mean(),
+        "Precision": df["Precision"].mean(),
+        "Recall": df["Recall"].mean(),
+        "F1": df["F1"].mean(),
+        "AUC": roc_auc,
     }
-    
+
     # Plot metrics as bar chart
     sns.barplot(x=list(metrics.keys()), y=list(metrics.values()))
     plt.ylim([0, 1])
-    plt.title('Performance Metrics')
-    plt.ylabel('Score')
-    
+    plt.title("Performance Metrics")
+    plt.ylabel("Score")
+
     plt.tight_layout()
     return plt
