@@ -193,15 +193,25 @@ def get_concatenate_df(results_df, relevant_docs_df, topk):
 
 
 # Function to calculate accuracy, precision, and recall
-def calculate_metrics(reference, candidate):
-    reference_tokens = set(reference.split())
-    candidate_tokens = set(candidate.split())
+def calculate_metrics(reference, candidate , total_tokens):
+    reference_tokens = set(reference.split(", "))
+    candidate_tokens = set(candidate.split(", "))
 
     true_positives = len(reference_tokens & candidate_tokens)
     false_positives = len(candidate_tokens - reference_tokens)
     false_negatives = len(reference_tokens - candidate_tokens)
+    # Correct True Negatives (TN) Calculation
+    true_negatives = len(total_tokens - (reference_tokens | candidate_tokens))  # TN
 
-    accuracy = true_positives / (true_positives + false_positives + false_negatives)
+
+    # Accuracy: (TP + TN) / (TP + FP + FN + TN)
+    accuracy = (
+        (true_positives + true_negatives)
+        / (true_positives + false_positives + false_negatives + true_negatives)
+        if (true_positives + false_positives + false_negatives + true_negatives) > 0
+        else 0
+    )
+
     precision = (
         true_positives / (true_positives + false_positives)
         if (true_positives + false_positives) > 0
@@ -222,10 +232,10 @@ def calculate_metrics(reference, candidate):
     return accuracy, precision, recall, F_one
 
 
-def apply_metrics(concatenated_df):
+def apply_metrics(concatenated_df , total_tokens):
     metrics = concatenated_df.apply(
         lambda row: calculate_metrics(
-            str(row["Annotated Docs"]), str(row["Retrieved Docs"])
+            str(row["Annotated Docs"]), str(row["Retrieved Docs"]) , total_tokens
         ),
         axis=1,
     )

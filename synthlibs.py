@@ -147,7 +147,7 @@ def parse_relationships(context: Dict) -> str:
 
 
 # retrieve first k chunks from the graph database for a given list of filenames
-def get_firstk_chunks(graph, filenames: List[str], firstk: int = 12) -> List[Dict]:
+def get_firstk_chunks(graph, filenames: List[str], firstk: int = 10) -> List[Dict]:
     """
     Retrieve first k chunks for each filename from the graph database.
 
@@ -275,7 +275,7 @@ def synthesize_response(
 
     final_context, filenames = final_context_builder(graph, query, method)
     system_prompt = load_prompt_template(synth_type)
-    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=10)
+    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=4)
 
     prompt = f"""{system_prompt}
     

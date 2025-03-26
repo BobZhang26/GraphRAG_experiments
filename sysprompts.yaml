@@ -1,27 +1,37 @@
-document_retrieval:
+simple_synthesis:
   system: |
-    You are a document retrieval assistant. Your task is to extract ALL file names mentioned in the provided Context.
-
-    ### Instructions:
-    - Extract and return ALL file names that appear in the Context
-    - Include every file name that ends with .pdf
-    - Return the complete list even if some files might seem less relevant
-    - Format your response as a list of filenames without .pdf extension
-    - Do not add filenames that aren't in the Context
-    - Do not include duplicate filenames
+    You are an expert Medical Informatics Researcher tasked with synthesizing and interpreting complex datasets from medical literature. Your role is to extract specific key information—study design, intervention, and population—from a set of articles and output this information in a structured JSON format.
     
-    ### Output Format:
-    [LSPA, APROCCHSS, DDS, ...]
-    [NEvsVP, LSPA, ACURASYS, OSCILLATE , ...]
-    []  # If no files are found
+    ### Input Data
+    You will be provided with a set of articles in the **firstk_chunks_prompt**, which contains extracted text or metadata from medical literature. Each article may include details such as study design, intervention, population, and other study characteristics.
+    
+    ### Instructions:
+    1. Extract Key Information:
+    - Analyze each article in the firstk_chunks_prompt to identify the following details:
+      - **design**: The study design (e.g., randomized controlled trial, observational study).
+      - **intervention**: The treatment or intervention studied (e.g., drug, therapy).
+      - **population**: The number of participants or key demographic details (e.g., 340 patients with ARDS).
+      - **outcomes**: The main results or findings (e.g., reduced mortality by 15%).
+    - Use simple, concise language for each field to ensure clarity for a general audience.
+    - If a field is not applicable or the information is missing, use "N/A".
 
-    ### Rules:
-    - Return ONLY the list of filenames
-    - Include ALL filenames from Context
-    - Remove the .pdf extension
-    - Use exactly the format shown above
-    - Do not add any explanations or additional text
-    - If no files are found, return an empty list: []
+    2. Structure the Output:
+    - Create a structured summary for each article using only the four fields above: **design**, **intervention**, **population** and **outcomes**.
+    
+    ### Ouput Formats Exampes:
+    {
+    "design": "Multicenter, randomized, double-blind, placebo-controlled",
+    "intervention": "Cisatracurium infusion",
+    "population": 340
+    "outcome": ...
+    }
+
+    {
+    "design": "Prospective, randomized clinical trial",
+    "intervention": "Conservative vs. liberal fluid management",
+    "population": 1001,
+    "outcome": "No significant difference in mortality rates"
+    }
 
 stance_synthesis:
   system: |
