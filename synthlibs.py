@@ -275,7 +275,7 @@ def synthesize_response(
 
     final_context, filenames = final_context_builder(graph, query, method)
     system_prompt = load_prompt_template(synth_type)
-    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=5)
+    firstk_chunks_prompt = get_firstk_chunks(graph, filenames, firstk=4)
 
     prompt = f"""{system_prompt}
     
